@@ -1035,13 +1035,34 @@ img, svg { display: block; }
   flex-shrink: 0;
   width: 56px;
 }
+.spline-slot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 .spline-slot:hover { background: rgba(255,255,255,0.05); }
-.spline-slot.is-now { background: rgba(255,255,255,0.08); }
-.spline-slot.is-now::after {
-  content: 'NOW';
-  position: absolute; top: -20px;
+.spline-slot.is-active {
+  background: rgba(255,255,255,0.12);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+}
+.spline-now-badge rect {
+  fill: rgba(var(--accent-rgb), 0.18);
+  stroke: rgba(var(--accent-rgb), 0.45);
+  stroke-width: 0.75;
+}
+.spline-now-badge text {
+  text-anchor: middle;
+  fill: var(--accent);
   font-size: 0.6rem; font-weight: 800;
-  letter-spacing: 0.08em; color: var(--accent);
+  letter-spacing: 0.08em;
+}
+.spline-point {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 180ms ease, filter 180ms ease;
+}
+.spline-point.is-active {
+  transform: scale(2);
+  filter: drop-shadow(0 0 4px var(--accent));
 }
 
 .spline-slot-time {
@@ -1197,9 +1218,10 @@ img, svg { display: block; }
   background: white;
   box-shadow: 0 2px 12px rgba(0,0,0,0.4), 0 0 0 3px rgba(var(--accent-rgb), 0.4);
   cursor: pointer;
-  transition: transform var(--ease-spring) 0.3s, box-shadow var(--t-base);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow var(--t-base);
 }
-.tm-slider::-webkit-slider-thumb:hover {
+.tm-slider::-webkit-slider-thumb:hover,
+.tm-slider::-webkit-slider-thumb:active {
   transform: scale(1.2);
   box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 0 0 5px rgba(var(--accent-rgb), 0.4);
 }
@@ -1208,6 +1230,12 @@ img, svg { display: block; }
   background: white; border: none;
   box-shadow: 0 2px 12px rgba(0,0,0,0.4);
   cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow var(--t-base);
+}
+.tm-slider::-moz-range-thumb:hover,
+.tm-slider::-moz-range-thumb:active {
+  transform: scale(1.2);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 0 0 5px rgba(var(--accent-rgb), 0.4);
 }
 
 .tm-track-fill {
@@ -1215,7 +1243,7 @@ img, svg { display: block; }
   height: 4px; border-radius: var(--r-full);
   background: linear-gradient(90deg, var(--accent), rgba(var(--accent-rgb), 0.5));
   pointer-events: none; z-index: 1;
-  transition: width 0.1s linear;
+  transition: none;
 }
 
 /* ---------------------------------------------------------

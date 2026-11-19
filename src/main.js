@@ -19,7 +19,7 @@ import { AtmosphereCanvas } from './canvas/atmosphere.js';
 import { renderCurrentWeather } from './components/currentWeather.js';
 import { renderGreeting } from './components/greetingBar.js';
 import { renderRecommendations } from './components/recommendations.js';
-import { renderHourlyChart } from './components/hourlyChart.js';
+import { renderHourlyChart, setActiveForecastHour } from './components/hourlyChart.js';
 import { initPlaylistPlayer, syncPlaylistForVibe } from './components/playlistPlayer.js';
 
 // Utils
@@ -40,6 +40,7 @@ const state = {
   simulatedHour: null,
 };
 let lastRealClockHour = null;
+let sliderAnimationFrame = null;
 
 /* ---------------------------------------------------------
    Canvas instance
@@ -79,15 +80,16 @@ function getSimulatedWeather(hour) {
   };
 }
 
-function updateTimeMachine(hour, isSimulation) {
+function updateTimeMachine(hour, isSimulation, sliderValue = hour) {
   const slider = document.getElementById('tm-slider');
   const label = document.getElementById('tm-time-label');
   const fill = document.getElementById('tm-track-fill');
   if (!slider || !label || !fill) return;
 
-  slider.value = String(hour);
+  slider.value = String(sliderValue);
+  const visualValue = Number(slider.value);
   label.textContent = `${String(hour).padStart(2, '0')}:00`;
-  fill.style.width = `${(hour / 23) * 100}%`;
+  fill.style.width = `${(visualValue / 23) * 100}%`;
   document.getElementById('tm-sim-badge').classList.toggle('hidden', !isSimulation);
   document.getElementById('tm-reset').classList.toggle('hidden', !isSimulation);
 
@@ -97,9 +99,10 @@ function updateTimeMachine(hour, isSimulation) {
     button.classList.toggle('active', active);
     button.setAttribute('aria-pressed', String(active));
   });
+  setActiveForecastHour(hour);
 }
 
-function renderWeatherForHour(hour, current, isSimulation) {
+function renderWeatherForHour(hour, current, isSimulation, sliderValue = hour) {
   const vibe = getVibeCategory(current.wmoCode, hour, current.isDay);
   state.vibe = vibe;
   applyVibe(vibe);
@@ -109,14 +112,54 @@ function renderWeatherForHour(hour, current, isSimulation) {
   renderRecommendations(getRecommendations(vibe, hour, current.temp), state.activeFilter);
   syncPlaylistForVibe(vibe, hour, isSimulation);
   if (!isSimulation) lastRealClockHour = hour;
-  updateTimeMachine(hour, isSimulation);
+  updateTimeMachine(hour, isSimulation, sliderValue);
 }
 
-function renderSelectedTime(hour, isSimulation = true) {
+function renderSelectedTime(hour, isSimulation = true, sliderValue = hour) {
   if (!state.weatherData) return;
   state.simulatedHour = isSimulation ? hour : null;
   const current = isSimulation ? getSimulatedWeather(hour) : state.weatherData.current;
-  renderWeatherForHour(hour, current, isSimulation);
+  renderWeatherForHour(hour, current, isSimulation, sliderValue);
+}
+
+function cancelSliderAnimation() {
+  if (sliderAnimationFrame !== null) {
+    cancelAnimationFrame(sliderAnimationFrame);
+    sliderAnimationFrame = null;
+  }
+}
+
+function animateToHour(targetHour) {
+  cancelSliderAnimation();
+  const slider = document.getElementById('tm-slider');
+  const startValue = Number(slider.value);
+  const startTime = performance.now();
+  const duration = 400;
+  let lastRenderedHour = state.simulatedHour ?? Math.round(startValue);
+
+  const animate = now => {
+    const progress = Math.min(1, (now - startTime) / duration);
+    const eased = 1 - ((1 - progress) ** 3);
+    const sliderValue = startValue + (targetHour - startValue) * eased;
+    const steppedValue = Math.round(sliderValue / 0.05) * 0.05;
+    const hour = Math.round(steppedValue);
+
+    if (hour !== lastRenderedHour || state.simulatedHour === null) {
+      renderSelectedTime(hour, true, steppedValue);
+      lastRenderedHour = hour;
+    } else {
+      updateTimeMachine(hour, true, steppedValue);
+    }
+
+    if (progress < 1) {
+      sliderAnimationFrame = requestAnimationFrame(animate);
+    } else {
+      sliderAnimationFrame = null;
+      renderSelectedTime(targetHour, true, targetHour);
+    }
+  };
+
+  sliderAnimationFrame = requestAnimationFrame(animate);
 }
 
 /* ---------------------------------------------------------
@@ -182,22 +225,20 @@ async function init(forceRefresh = false) {
       }
     }
 
-    // Step 2: Check cache (unless forced refresh)
-    let weatherData = forceRefresh ? null : getCachedWeather();
+    // Keep location lookup independent of the weather cache so the city is
+    // still resolved on a cached first load.
+    const cachedWeather = forceRefresh ? null : getCachedWeather();
+    const shouldFetchWeather = !cachedWeather;
+    const [weatherData, cityName] = await Promise.all([
+      cachedWeather || fetchWeather(coords.lat, coords.lon),
+      state.cityName === 'Lokasimu'
+        ? reverseGeocode(coords.lat, coords.lon)
+        : Promise.resolve(state.cityName),
+    ]);
 
-    if (!weatherData) {
-      // Fetch weather + geocode in parallel for speed
-      const [weather, cityName] = await Promise.all([
-        fetchWeather(coords.lat, coords.lon),
-        state.cityName === 'Lokasimu'
-          ? reverseGeocode(coords.lat, coords.lon)
-          : Promise.resolve(state.cityName),
-      ]);
-
-      weatherData = weather;
-      state.cityName = cityName;
+    state.cityName = cityName;
+    if (shouldFetchWeather) {
       setCachedWeather(weatherData);
-
       if (forceRefresh) toast('Data cuaca diperbarui!', 'success');
     }
 
@@ -211,6 +252,7 @@ async function init(forceRefresh = false) {
 
     // Step 4: Render the forecast, which remains based on API data.
     renderHourlyChart(weatherData.hourly);
+    setActiveForecastHour(hour);
 
     // Step 6: Show content
     showWeatherContent();
@@ -314,18 +356,27 @@ document.querySelectorAll('.recs-tab').forEach(button => {
 
 // Time machine slider and scenario presets
 document.getElementById('tm-slider')?.addEventListener('input', event => {
-  renderSelectedTime(Number(event.currentTarget.value));
+  cancelSliderAnimation();
+  const sliderValue = Number(event.currentTarget.value);
+  const hour = Math.round(sliderValue);
+  if (state.simulatedHour !== hour) renderSelectedTime(hour, true, sliderValue);
+  else updateTimeMachine(hour, true, sliderValue);
 });
 
 document.querySelectorAll('.tm-preset').forEach(button => {
   button.addEventListener('click', () => {
     const preset = PRESETS.find(item => item.name === button.dataset.preset);
-    if (preset) renderSelectedTime(preset.hour);
+    if (preset) animateToHour(preset.hour);
   });
+});
+
+document.addEventListener('forecast-hour-select', event => {
+  animateToHour(event.detail.hour);
 });
 
 document.getElementById('tm-reset')?.addEventListener('click', () => {
   if (!state.weatherData) return;
+  cancelSliderAnimation();
   renderSelectedTime(new Date().getHours(), false);
 });
 

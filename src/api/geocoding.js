@@ -8,7 +8,7 @@ const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/reverse';
 
 /**
  * Reverse geocode coordinates to a city/district name.
- * Returns "Jakarta" as fallback if the lookup fails.
+ * Returns a location-specific fallback if the lookup has no named result.
  *
  * @param {number} lat
  * @param {number} lon
@@ -35,15 +35,20 @@ export async function reverseGeocode(lat, lon) {
     const data = await response.json();
     const addr = data.address || {};
 
-    // Priority: city > town > county > state
+    // Prefer a city or local district over a broader county or state.
     const name =
       addr.city ||
       addr.town ||
+      addr.city_district ||
       addr.municipality ||
+      addr.village ||
+      addr.suburb ||
+      addr.hamlet ||
       addr.county ||
       addr.state_district ||
       addr.state ||
-      'Lokasimu';
+      data.display_name?.split(',')[0] ||
+      `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
 
     // Strip "Kota " prefix for cleaner display
     return name.replace(/^Kota\s+/i, '');
