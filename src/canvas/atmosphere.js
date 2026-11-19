@@ -17,6 +17,7 @@ export class AtmosphereCanvas {
   #particles = [];
   /** @type {number} */
   #lastTime = 0;
+  #fadeFrame = null;
 
   constructor(canvasEl) {
     this.#canvas = canvasEl;
@@ -38,8 +39,15 @@ export class AtmosphereCanvas {
    * @param {string} vibe
    */
   setVibe(vibe) {
+    if (vibe === this.#vibe) return;
+    if (this.#fadeFrame !== null) cancelAnimationFrame(this.#fadeFrame);
+    this.#canvas.classList.add('atmosphere-fading');
     this.#vibe = vibe;
     this.#seed();
+    this.#fadeFrame = requestAnimationFrame(() => {
+      this.#canvas.classList.remove('atmosphere-fading');
+      this.#fadeFrame = null;
+    });
   }
 
   /** Seed particle array based on current vibe */

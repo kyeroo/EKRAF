@@ -47,7 +47,7 @@ function createRecCard(rec, index) {
     attrs: {
       role: 'listitem',
       'data-category': rec.type,
-      style: `animation: fade-in-up 0.4s ${index * 0.07}s ease both;`,
+      style: `animation: card-enter 350ms cubic-bezier(0.22, 1, 0.36, 1) ${index * 45}ms both;`,
     },
   });
 

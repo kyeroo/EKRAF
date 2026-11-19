@@ -80,6 +80,25 @@ function getSimulatedWeather(hour) {
   };
 }
 
+function updateSlidingPill(group, activeButton) {
+  if (!group) return;
+  if (!activeButton) {
+    group.style.setProperty('--pill-opacity', '0');
+    return;
+  }
+
+  const groupRect = group.getBoundingClientRect();
+  const buttonRect = activeButton.getBoundingClientRect();
+  group.style.setProperty('--pill-x', `${buttonRect.left - groupRect.left + group.scrollLeft}px`);
+  group.style.setProperty('--pill-width', `${buttonRect.width}px`);
+  group.style.setProperty('--pill-opacity', '1');
+}
+
+function updateAllSlidingPills() {
+  updateSlidingPill(document.querySelector('.recs-tabs'), document.querySelector('.recs-tab.active'));
+  updateSlidingPill(document.querySelector('.tm-presets'), document.querySelector('.tm-preset.active'));
+}
+
 function updateTimeMachine(hour, isSimulation, sliderValue = hour) {
   const slider = document.getElementById('tm-slider');
   const label = document.getElementById('tm-time-label');
@@ -99,6 +118,7 @@ function updateTimeMachine(hour, isSimulation, sliderValue = hour) {
     button.classList.toggle('active', active);
     button.setAttribute('aria-pressed', String(active));
   });
+  updateSlidingPill(document.querySelector('.tm-presets'), document.querySelector('.tm-preset.active'));
   setActiveForecastHour(hour);
 }
 
@@ -344,6 +364,7 @@ document.querySelectorAll('.recs-tab').forEach(button => {
       tab.classList.toggle('active', active);
       tab.setAttribute('aria-selected', String(active));
     });
+    updateSlidingPill(button.parentElement, button);
     if (state.weatherData) {
       const hour = state.simulatedHour ?? new Date().getHours();
       const current = state.simulatedHour === null
@@ -353,6 +374,39 @@ document.querySelectorAll('.recs-tab').forEach(button => {
     }
   });
 });
+
+updateAllSlidingPills();
+window.addEventListener('resize', updateAllSlidingPills, { passive: true });
+
+let pointerFrame = null;
+let latestPointer = null;
+document.addEventListener('pointermove', event => {
+  if (event.pointerType === 'touch' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  latestPointer = {
+    x: event.clientX,
+    y: event.clientY,
+    card: event.target.closest?.('.rec-card, .playlist-widget') || null,
+  };
+  if (pointerFrame !== null) return;
+
+  pointerFrame = requestAnimationFrame(() => {
+    pointerFrame = null;
+    const sky = document.querySelector('.sky-layer');
+    const { x, y, card } = latestPointer;
+    const parallaxX = ((x / window.innerWidth) - 0.5) * 20;
+    const parallaxY = ((y / window.innerHeight) - 0.5) * 20;
+    sky.style.setProperty('--sky-parallax-x', `${parallaxX.toFixed(1)}px`);
+    sky.style.setProperty('--sky-parallax-y', `${parallaxY.toFixed(1)}px`);
+    sky.style.setProperty('--cloud-parallax-x', `${(parallaxX * 0.55).toFixed(1)}px`);
+    sky.style.setProperty('--cloud-parallax-y', `${(parallaxY * 0.55).toFixed(1)}px`);
+
+    if (card) {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty('--spot-x', `${x - rect.left}px`);
+      card.style.setProperty('--spot-y', `${y - rect.top}px`);
+    }
+  });
+}, { passive: true });
 
 // Time machine slider and scenario presets
 document.getElementById('tm-slider')?.addEventListener('input', event => {

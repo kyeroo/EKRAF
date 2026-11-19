@@ -4,6 +4,16 @@
 
 import { iconSvg } from './icons.js';
 
+export function animateContent(target) {
+  const element = typeof target === 'string' ? document.getElementById(target) : target;
+  if (!element) return;
+
+  element.classList.remove('content-enter');
+  void element.offsetWidth;
+  element.classList.add('content-enter');
+  element.addEventListener('animationend', () => element.classList.remove('content-enter'), { once: true });
+}
+
 /* ---------------------------------------------------------
    Toast Notifications
    --------------------------------------------------------- */
