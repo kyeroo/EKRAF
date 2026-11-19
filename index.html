@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="id" data-vibe="clear-day">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Mesin Waktu Suasana — Cuaca hiper-lokal berbasis suasana. Dapatkan rekomendasi aktivitas, kuliner, dan atmosfer visual sesuai kondisi cuaca di lokasimu." />
+  <meta name="theme-color" content="#0f172a" />
+  <meta property="og:title" content="Mesin Waktu Suasana" />
+  <meta property="og:description" content="Cuaca hiper-lokal berbasis suasana — lebih dari sekadar angka suhu." />
+  <meta property="og:type" content="website" />
+
+  <title>Mesin Waktu Suasana</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+
+  <!-- Canvas Layer: Atmospheric Particles -->
+  <canvas id="atmosphere-canvas" aria-hidden="true"></canvas>
+
+  <!-- Sky Layers -->
+  <div class="sky-layer" aria-hidden="true">
+    <div class="sky-gradient"></div>
+    <div class="celestial-body" id="celestial-body"></div>
+    <div class="cloud-layer" id="cloud-layer">
+      <div class="cloud cloud-1"></div>
+      <div class="cloud cloud-2"></div>
+      <div class="cloud cloud-3"></div>
+    </div>
+    <!-- Lightning flashes (storm only) -->
+    <div class="lightning-layer" id="lightning-layer" aria-hidden="true"></div>
+  </div>
+
+  <!-- App Shell -->
+  <div id="app" class="app">
+
+    <!-- Header -->
+    <header class="app-header" role="banner">
+      <div class="header-brand">
+        <span class="brand-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9 2h6M12 2v3"/></svg>
+        </span>
+        <span class="brand-name">Mesin Waktu Suasana</span>
+      </div>
+      <div class="header-actions">
+        <span id="current-time-display" class="time-display" aria-live="polite"></span>
+        <button id="audio-pill" class="audio-pill" aria-label="Toggle ambient sound" title="Suara Ambient" aria-pressed="false">
+          <div class="eq-wrap" aria-hidden="true">
+            <span class="eq-bar b1"></span>
+            <span class="eq-bar b2"></span>
+            <span class="eq-bar b3"></span>
+            <span class="eq-bar b4"></span>
+          </div>
+          <span class="audio-label">Ambient</span>
+        </button>
+        <button id="btn-refresh" class="btn-icon" title="Refresh data cuaca" aria-label="Refresh data cuaca">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="main-content" class="main-content" role="main">
+
+      <!-- Loading State -->
+      <div id="loading-state" class="loading-state" role="status" aria-live="polite">
+        <div class="loading-orb" aria-hidden="true">
+          <div class="loading-spinner"></div>
+        </div>
+        <p class="loading-text">Mendeteksi lokasimu<span class="loading-dots"></span></p>
+        <p class="loading-sub">Izinkan akses lokasi untuk pengalaman terbaik</p>
+      </div>
+
+      <!-- Error State -->
+      <div id="error-state" class="error-state hidden" role="alert">
+        <div class="error-icon" aria-hidden="true">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>
+        </div>
+        <h2 class="error-title">Gagal Mendapatkan Data</h2>
+        <p id="error-message" class="error-message"></p>
+        <div class="error-actions">
+          <button id="btn-retry" class="btn-primary">Coba Lagi</button>
+          <button id="btn-use-jakarta" class="btn-secondary">Gunakan Jakarta</button>
+        </div>
+      </div>
+
+      <!-- Weather Content -->
+      <div id="weather-content" class="weather-content hidden">
+
+        <!-- Hero Section -->
+        <section class="hero-section" aria-label="Cuaca saat ini">
+
+          <!-- Greeting Bar -->
+          <div class="greeting-bar" id="greeting-bar" aria-live="polite">
+            <div class="greeting-pulse" aria-hidden="true"></div>
+            <p id="greeting-text" class="greeting-text"></p>
+          </div>
+
+          <div class="hero-dashboard">
+          <!-- Weather Hero Card -->
+          <div class="weather-hero glass-card">
+            <div class="weather-hero-left">
+              <div class="location-info">
+                <svg class="location-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span id="city-name" class="city-name">—</span>
+              </div>
+
+              <div class="temp-display-wrap">
+                <div class="temp-display">
+                  <span id="current-temp" class="temp-value" data-prev="0">—</span>
+                  <span class="temp-unit">°C</span>
+                </div>
+              </div>
+
+              <div class="condition-row">
+                <span id="condition-icon" class="condition-icon" aria-hidden="true"></span>
+                <span id="condition-text" class="condition-text">Memuat…</span>
+              </div>
+            </div>
+
+            <!-- Metric Cards -->
+            <div class="weather-metrics" role="list" aria-label="Detail cuaca">
+
+              <!-- Feels Like -->
+              <div class="metric-card" role="listitem">
+                <span class="metric-label">Terasa Seperti</span>
+                <span id="feels-like" class="metric-value">—</span>
+                <div class="metric-feels-bar">
+                  <div class="metric-feels-fill" id="feels-fill"></div>
+                </div>
+              </div>
+
+              <!-- Humidity -->
+              <div class="metric-card" role="listitem">
+                <span class="metric-label">Kelembapan</span>
+                <span id="humidity" class="metric-value">—</span>
+                <div class="metric-humidity-visual">
+                <div class="metric-humidity-bar" aria-hidden="true">
+                  <div class="metric-humidity-fill" id="humidity-fill"></div>
+                </div>
+                </div>
+              </div>
+
+              <!-- Wind -->
+              <div class="metric-card" role="listitem">
+                <span class="metric-label">Kecepatan Angin</span>
+                <span id="wind-speed" class="metric-value">—</span>
+                <div class="wind-streaks" id="wind-streaks" aria-hidden="true">
+                  <div class="wind-streak" style="--d:0s;--w:60%"></div>
+                  <div class="wind-streak" style="--d:0.4s;--w:80%"></div>
+                  <div class="wind-streak" style="--d:0.2s;--w:45%"></div>
+                </div>
+              </div>
+
+              <!-- UV Index -->
+              <div class="metric-card" role="listitem">
+                <span class="metric-label">UV Index</span>
+                <span id="uv-index" class="metric-value">—</span>
+                <div class="uv-arc-wrap" aria-hidden="true">
+                  <svg viewBox="0 0 100 56" class="uv-arc-svg">
+                    <defs>
+                      <linearGradient id="uv-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%"   stop-color="#4ade80"/>
+                        <stop offset="40%"  stop-color="#facc15"/>
+                        <stop offset="70%"  stop-color="#fb923c"/>
+                        <stop offset="100%" stop-color="#ef4444"/>
+                      </linearGradient>
+                    </defs>
+                    <!-- Track -->
+                    <path d="M 10 52 A 40 40 0 0 1 90 52" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8" stroke-linecap="round"/>
+                    <!-- Fill -->
+                    <path id="uv-arc-fill" d="M 10 52 A 40 40 0 0 1 90 52" fill="none" stroke="url(#uv-grad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="0 126"/>
+                  </svg>
+                </div>
+              </div>
+
+            </div><!-- /metrics -->
+          </div><!-- /weather-hero -->
+
+          <aside id="playlist-widget" class="playlist-widget glass-card" aria-label="Playlist Suasana dan pemutar musik">
+            <div class="playlist-widget-heading">
+              <span class="playlist-heading-icon bg-white/10 p-2 rounded-lg" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              </span>
+              <div class="playlist-heading-copy">
+                <span class="playlist-eyebrow">Playlist Suasana</span>
+                <span id="playlist-mode-label" class="playlist-mode-label">Otomatis</span>
+              </div>
+            </div>
+
+            <div class="playlist-copy">
+              <h2 id="playlist-name" class="playlist-name">Acoustic Morning &amp; Coffee</h2>
+              <p id="playlist-description" class="playlist-description"></p>
+            </div>
+
+            <div class="playlist-moods" role="group" aria-label="Pilih mood playlist">
+              <button class="playlist-mood active" data-mood="auto" aria-pressed="true">Otomatis</button>
+              <button class="playlist-mood" data-mood="focus" aria-pressed="false">Fokus</button>
+              <button class="playlist-mood" data-mood="relax" aria-pressed="false">Santai</button>
+              <button class="playlist-mood" data-mood="energy" aria-pressed="false">Semangat</button>
+            </div>
+
+            <div id="playlist-tracks" class="playlist-tracks" role="group" aria-label="Daftar lagu"></div>
+
+            <div class="player-current" aria-live="polite">
+              <div class="player-current-copy">
+                <span id="player-current-title" class="player-current-title"></span>
+                <span id="player-current-artist" class="player-current-artist"></span>
+              </div>
+              <span id="player-track-position" class="player-track-position">01 / 03</span>
+            </div>
+
+            <div class="player-progress-row">
+              <span id="player-current-time" class="player-time">0:00</span>
+              <div id="player-progress" class="player-progress" role="progressbar" aria-label="Progres lagu" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div id="player-progress-fill" class="player-progress-fill"></div>
+              </div>
+              <span id="player-track-duration" class="player-time">0:00</span>
+            </div>
+
+            <div class="player-controls">
+              <button id="player-previous" class="player-control-btn" type="button" aria-label="Lagu sebelumnya" title="Sebelumnya"></button>
+              <button id="player-play" class="player-play-btn" type="button" aria-label="Putar musik" title="Putar"></button>
+              <button id="player-next" class="player-control-btn" type="button" aria-label="Lagu berikutnya" title="Berikutnya"></button>
+              <label class="player-volume-control" for="player-volume">
+                <span id="player-volume-icon" aria-hidden="true"></span>
+                <input id="player-volume" type="range" min="0" max="1" step="0.01" value="0.65" aria-label="Volume musik">
+              </label>
+            </div>
+
+            <button id="player-effects" class="player-effects-btn active" type="button" aria-pressed="true">
+              <span id="player-effects-icon" aria-hidden="true"></span>
+              <span>Efek suasana</span>
+              <span class="player-effects-state">Aktif</span>
+            </button>
+          </aside>
+          </div><!-- /hero-dashboard -->
+
+        </section>
+
+        <!-- Recommendations Section -->
+        <section class="recommendations-section" aria-label="Rekomendasi aktivitas dan kuliner">
+          <div class="section-header">
+            <h2 class="section-title">
+              <span class="section-title-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3Z"/><path d="m19 14 1 2.5 2.5 1-2.5 1L19 21l-1-2.5-2.5-1 2.5-1 1-2.5Z"/></svg></span>
+              Saran Hari Ini
+            </h2>
+            <!-- Tab Filter -->
+            <div class="recs-tabs" role="tablist" aria-label="Filter rekomendasi">
+              <button class="recs-tab active" data-filter="all" role="tab" aria-selected="true">Semua</button>
+              <button class="recs-tab" data-filter="activity" role="tab" aria-selected="false">Aktivitas</button>
+              <button class="recs-tab" data-filter="food" role="tab" aria-selected="false">Kuliner</button>
+            </div>
+          </div>
+          <div class="recs-bento" id="recs-grid" role="list" aria-label="Kartu rekomendasi"></div>
+        </section>
+
+        <!-- 24-Hour Forecast Section -->
+        <section class="forecast-section" aria-label="Prakiraan per jam">
+          <h2 class="section-title">
+            <span class="section-title-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-5 5"/></svg></span>
+            Prakiraan 24 Jam
+          </h2>
+          <div class="spline-chart-wrapper" role="region" aria-label="Grafik prakiraan suhu per jam, geser horizontal">
+            <div class="spline-chart-inner" id="spline-chart-inner">
+              <!-- SVG curve -->
+              <svg id="spline-svg" class="spline-svg" aria-hidden="true"></svg>
+              <!-- Hour slots row -->
+              <div class="spline-slots" id="spline-slots" role="list"></div>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /weather-content -->
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer" role="contentinfo">
+      <p>Data cuaca dari <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer">Open-Meteo</a> · Dibuat untuk suasana Indonesia</p>
+    </footer>
+
+    <!-- ═══ TIME MACHINE BAR ═══ -->
+    <div id="time-machine" class="time-machine" role="complementary" aria-label="Mesin waktu simulasi">
+      <div class="tm-inner">
+        <div class="tm-top-row">
+          <div class="tm-brand">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9 2h6M12 2v3"/></svg>
+            <span class="tm-brand-label">Mesin Waktu</span>
+          </div>
+          <div class="tm-badges">
+            <span id="tm-time-label" class="tm-current-time" aria-live="polite">12:00</span>
+            <span id="tm-sim-badge" class="tm-sim-badge hidden" aria-live="polite">Mode Simulasi</span>
+            <button id="tm-reset" class="tm-reset-btn hidden" aria-label="Kembali ke waktu real-time">Waktu Nyata</button>
+          </div>
+        </div>
+
+        <div class="tm-presets" role="group" aria-label="Preset suasana">
+          <button class="tm-preset" data-preset="Pagi Cerah" aria-label="Simulasi pagi cerah jam 7">Pagi Cerah</button>
+          <button class="tm-preset" data-preset="Siang Terik" aria-label="Simulasi siang terik jam 1">Siang Terik</button>
+          <button class="tm-preset" data-preset="Gerimis Sore" aria-label="Simulasi gerimis sore jam 4">Gerimis</button>
+          <button class="tm-preset" data-preset="Malam Hujan" aria-label="Simulasi malam hujan jam 8">Malam Hujan</button>
+          <button class="tm-preset" data-preset="Tengah Malam" aria-label="Simulasi tengah malam jam 12">Tengah Malam</button>
+        </div>
+
+        <div class="tm-slider-row">
+          <span class="tm-hour-label">00</span>
+          <div class="tm-track-wrap">
+            <input type="range" id="tm-slider" class="tm-slider" min="0" max="23" step="1" value="12" aria-label="Jam simulasi 0 sampai 23">
+            <div class="tm-track-fill" id="tm-track-fill"></div>
+          </div>
+          <span class="tm-hour-label">23</span>
+        </div>
+      </div>
+    </div><!-- /time-machine -->
+
+  </div><!-- /app -->
+
+  <!-- ═══ DETAIL MODAL / DRAWER ═══ -->
+  <div id="detail-modal" class="detail-modal" role="dialog" aria-modal="true" aria-label="Detail rekomendasi" aria-hidden="true">
+    <div class="detail-backdrop" id="detail-backdrop" aria-hidden="true"></div>
+    <div class="detail-drawer" id="detail-drawer">
+      <div class="detail-handle" aria-hidden="true"></div>
+      <div id="detail-content" class="detail-content"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
